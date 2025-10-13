@@ -130,5 +130,40 @@ namespace SmsAPI.Controllers
             writer.WriteEndArray();
             await writer.FlushAsync();
         }
+        [HttpPost("UploadPersonDocs")]
+        public async Task<IActionResult> UploadPersonDocs(IFormFile file)
+        {
+            try
+            {
+                if (file == null || file.Length == 0)
+                {
+                    return BadRequest("File not selected");
+                }
+
+                var uploadDir = Path.Combine(Directory.GetCurrentDirectory(), "uploads");
+                if (!Directory.Exists(uploadDir))
+                {
+                    Directory.CreateDirectory(uploadDir);
+                }
+
+                var uniqueFileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+                var filePath = Path.Combine(uploadDir, uniqueFileName);
+
+                using (var stream = new FileStream(filePath, FileMode.Create, FileAccess.Write))
+                {
+                    await file.CopyToAsync(stream);
+                }
+
+                return Ok(new { file.FileName, file.Length, SavedAs = uniqueFileName });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                return StatusCode(500, $"Access denied while uploading file: {ex.Message}");
+            }
+            catch (Exception ex)
+            {
+                return StatusCode(500, $"File upload failed: {ex.Message}");
+            }
+        }
     }
 }
