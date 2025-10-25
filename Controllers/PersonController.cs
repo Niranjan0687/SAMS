@@ -1,6 +1,10 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Caching.Distributed;
+using Microsoft.Extensions.Caching.Memory;
+using SmsAPI.Contract;
 using SmsAPI.Data;
 using SmsAPI.Models;
 using System.Text.Json;
@@ -12,40 +16,81 @@ namespace SmsAPI.Controllers
     public class PersonController : ControllerBase
     {
         private readonly AdmissionDbContext _context;
-        public PersonController(AdmissionDbContext context)
+        private readonly IMemoryCache _memorycache;
+        private readonly IPersonService _personService;
+
+        public PersonController(AdmissionDbContext context,IMemoryCache memorycache,IPersonService personservice)
         {
             _context = context;
+            _memorycache = memorycache;
+            _personService = personservice;
         }
-        public static string da()
-        {
-            var x = 42;  // Magic number
-            string y = null;
-            try
-            {
-                var z = (string)("Hello from PersonController");  // Redundant cast
-                if (true == true)  // Redundant condition
-                {
-                    y = z;
-                }
-                else
-                {
-                    y = z.ToString();  // Redundant ToString
-                }
-            }
-            catch  // Empty catch block
-            {
-            }
-            finally
-            {
-                var unusedVar = "unused";  // Unused variable
-            }
-            return (string)y;  // Unnecessary cast
-        }
-        [HttpGet("GetPerson")]
+        //public static string da()
+        //{
+        //    var x = 42;  // Magic number
+        //    string y = null;
+        //    try
+        //    {
+        //        var z = (string)("Hello from PersonController");  // Redundant cast
+        //        if (true == true)  // Redundant condition
+        //        {
+        //            y = z;
+        //        }
+        //        else
+        //        {
+        //            y = z.ToString();  // Redundant ToString
+        //        }
+        //    }
+        //    catch  // Empty catch block
+        //    {
+        //    }
+        //    finally
+        //    {
+        //        var unusedVar = "unused";  // Unused variable
+        //    }
+        //    return (string)y;  // Unnecessary cast
+        //}
+        
+        [HttpGet("GetPersonHnd")]
+        
         public IActionResult GetPerson()
         {
-            var personlist = _context.person.Where(s => s.Title != null).ToList();
+            const string cacheKey = "ChPersonList";
+
+            if (!_memorycache.TryGetValue(cacheKey, out List<Person> personlist))
+            {
+                personlist = _context.person.Where(s => s.Title != null).ToList();
+               
+                var cacheOption=new MemoryCacheEntryOptions().SetAbsoluteExpiration(TimeSpan.FromMinutes(5)).SetSlidingExpiration(TimeSpan.FromMinutes(2));
+                _memorycache.Set(cacheKey, personlist,cacheOption);
+
+            }
+            else
+            {
+                Console.WriteLine("Cache hit — returning data from memory...");
+            }
+            
+           
             return Ok(personlist);
+        }
+        [HttpGet("ClearCache")]
+        public IActionResult clearcache()
+        {
+            _memorycache.Remove("ChPersonList");
+            return Ok("Cache cleared successfully");
+        }
+
+
+        [HttpGet("PersonbyId/{id}")]
+   
+        public IActionResult GetPersonById(int id)
+        {
+            var person = _context.person.Find(id);
+            if (person == null)
+            {
+                return NotFound("Person not found");
+            }
+            return Ok(person);
         }
         [HttpGet("GetAll")]
         public IActionResult GetAll()
