@@ -15,19 +15,22 @@ namespace SmsAPI.Services
         }
         public string GenerateAccessToken(IEnumerable<Claim> claims)
         {
-            var key =new SymmetricSecurityKey(Encoding.UTF8.GetBytes( _configuration["Jwt:Key"]));
-            var cred=new SigningCredentials(key,SecurityAlgorithms.HmacSha256);
+            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
+            var cred = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
 
-            var token=new JwtSecurityToken(
-                
+            var expirationMinutesString = _configuration["Jwt:AccessTokenExpirationMinutes"];
+            var expirationMinutes = !string.IsNullOrEmpty(expirationMinutesString)
+                ? double.Parse(expirationMinutesString)
+                : 60; // Default to 60 minutes if not set
+
+            var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
-                claims:claims,
-                expires: DateTime.Now.AddMinutes(double.Parse(_configuration["Jwt:AccessTokenExpirationMinutes"])),
+                claims: claims,
+                expires: DateTime.Now.AddMinutes(expirationMinutes),
                 signingCredentials: cred
-                );
-            // Logic to generate JWT access token using the secret key
-            return  new JwtSecurityTokenHandler().WriteToken(token);
+            );
+            return new JwtSecurityTokenHandler().WriteToken(token);
         }
         public string GenerateRefreshToken()
         {
